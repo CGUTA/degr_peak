@@ -22,6 +22,7 @@ mappings_with_source_unordered = fread("peak_data.txt")
 mappings_with_source_unordered[, $params.gene_id := as.character($params.gene_id)]
 setkey(mappings_with_source_unordered, $params.gene_id)
 all_mappings_with_source = mappings_with_source_unordered[J(rownames(density_matrix)), nomatch = 0]
+other_mappings_with_source = mappings_with_source_unordered[!J(rownames(density_matrix)), nomatch = 0]
 
 setDTthreads(1)  ## disable multithreading as it interferes with following cluster
 
@@ -31,6 +32,7 @@ clust <- makeCluster($params.cores, type="FORK")
 regions_list <- parLapply(clust, 4:ncol(all_mappings_with_source), function(source_colnumber)
 {
   mappings_with_source = all_mappings_with_source[, c(1:3, source_colnumber), with = FALSE]
+  other_chr_ref_mappings = other_mappings_with_source[, c(source_colnumber), with = FALSE][[1]]
   
   source_to_evaluate <- mappings_with_source[[4]] # last column is the source
   
@@ -39,7 +41,9 @@ regions_list <- parLapply(clust, 4:ncol(all_mappings_with_source), function(sour
   set_seed = 123456 + source_colnumber
   set.seed(set_seed)
   
-  permutations <- cbind(source_to_evaluate, replicate(n_permutations, sample(source_to_evaluate)))
+  permutations <- cbind(source_to_evaluate, 
+                        replicate(n_permutations, sample(other_chr_ref_mappings, 
+                                                             length(source_to_evaluate))))
   
   smoothened_permutations = density_matrix %*% permutations #smothening the permuted values
   
